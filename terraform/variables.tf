@@ -22,3 +22,9 @@ variable "app_version" {
   type    = string
   default = "v0.1.0"
 }
+
+variable "alert_email" {
+  type        = string
+  description = "Correo que recibe las notificaciones de las alarmas"
+}
+
