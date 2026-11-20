@@ -1,0 +1,40 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0, "y": 0, "width": 8, "height": 6,
+      "properties": {
+        "title": "RDS CPUUtilization (nativa AWS)",
+        "region": "us-east-1",
+        "view": "timeSeries",
+        "stat": "Average",
+        "period": 300,
+        "metrics": [["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", "todo-list-db"]]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8, "y": 0, "width": 8, "height": 6,
+      "properties": {
+        "title": "Errores de RDS (TodoApp/RDSErrors)",
+        "region": "us-east-1",
+        "view": "timeSeries",
+        "stat": "Sum",
+        "period": 60,
+        "metrics": [["TodoApp", "RDSErrors"]]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16, "y": 0, "width": 8, "height": 6,
+      "properties": {
+        "title": "Tareas creadas (TodoApp/TasksCreated)",
+        "region": "us-east-1",
+        "view": "timeSeries",
+        "stat": "Sum",
+        "period": 300,
+        "metrics": [["TodoApp", "TasksCreated"]]
+      }
+    }
+  ]
+}

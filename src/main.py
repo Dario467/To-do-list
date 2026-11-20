@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -9,12 +10,31 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="to-do-list-api")
+logger = logging.getLogger("uvicorn.error")
+METRIC_NAMESPACE = "TodoApp"
 _table_ready = False
+_cloudwatch = None
 
 
 class TaskIn(BaseModel):
     title: str
     done: bool = False
+
+
+def put_metric(name, value=1, unit="Count"):
+    """Envia una metrica propia a CloudWatch. Si falla, no rompe la app."""
+    global _cloudwatch
+    try:
+        if _cloudwatch is None:
+            _cloudwatch = boto3.client(
+                "cloudwatch", region_name=os.getenv("AWS_REGION", "us-east-1")
+            )
+        _cloudwatch.put_metric_data(
+            Namespace=METRIC_NAMESPACE,
+            MetricData=[{"MetricName": name, "Value": value, "Unit": unit}],
+        )
+    except Exception as e:
+        logger.warning("No se pudo enviar la metrica %s: %s", name, e)
 
 
 def get_credentials():
@@ -51,28 +71,36 @@ def get_conn():
 
 
 def fetch_tasks():
-    conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, title, done FROM tasks ORDER BY id")
-            return [
-                {"id": r["id"], "title": r["title"], "done": bool(r["done"])}
-                for r in cur.fetchall()
-            ]
-    finally:
-        conn.close()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, title, done FROM tasks ORDER BY id")
+                return [
+                    {"id": r["id"], "title": r["title"], "done": bool(r["done"])}
+                    for r in cur.fetchall()
+                ]
+        finally:
+            conn.close()
+    except Exception:
+        put_metric("RDSErrors")
+        raise
 
 
 def insert_task(title, done):
-    conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO tasks (title, done) VALUES (%s, %s)", (title, done)
-            )
-            return {"id": cur.lastrowid, "title": title, "done": done}
-    finally:
-        conn.close()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO tasks (title, done) VALUES (%s, %s)", (title, done)
+                )
+                return {"id": cur.lastrowid, "title": title, "done": done}
+        finally:
+            conn.close()
+    except Exception:
+        put_metric("RDSErrors")
+        raise
 
 
 def check_db():
@@ -85,6 +113,7 @@ def check_db():
         finally:
             conn.close()
     except Exception:
+        put_metric("RDSErrors")
         return False
 
 
@@ -99,7 +128,9 @@ def list_tasks():
 
 @app.post("/tasks", status_code=201)
 def create_task(task: TaskIn):
-    return insert_task(task.title, task.done)
+    created = insert_task(task.title, task.done)
+    put_metric("TasksCreated")
+    return created
 
 
 @app.get("/version")
