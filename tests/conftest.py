@@ -1,5 +1,6 @@
 import pytest
-import src.main as main
+
+import main
 
 
 @pytest.fixture(autouse=True)
